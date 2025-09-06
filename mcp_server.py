@@ -6,13 +6,6 @@ app = FastAPI()
 
 # --- Pydantic Models ---
 
-from fastapi import FastAPI
-from pydantic import BaseModel
-
-app = FastAPI()
-
-# --- Pydantic Models ---
-
 class Ingredient(BaseModel):
     name: str
     category: str | None = None
@@ -30,6 +23,9 @@ class Meal(BaseModel):
     total_protein_g: float | None = None
     ingredients: list[Ingredient]
 
+@app.get("/")
+def read_root():
+    return {"message": "MCP Food Log Server is running."}
 
 @app.get("/get_log", response_model=list[Meal])
 def get_log():
@@ -51,19 +47,23 @@ def get_log():
         
         for line in lines:
             if line.startswith("**"):
-                try:
-                    key, value = line.split(":", 1)
-                    key = key.replace("**", "").strip().lower().replace(" ", "_")
-                    metadata[key] = value.strip()
-                except ValueError:
-                    continue # Skip malformed metadata lines
+                colon_index = line.find(':')
+                if colon_index != -1:
+                    key_str = line[:colon_index]
+                    value_str = line[colon_index+1:]
+                    
+                    key = key_str.replace("**", "").strip().lower().replace(" ", "_").replace("(", "").replace(")", "")
+                    value = value_str.replace("**", "").strip()
+                    metadata[key] = value
+                else:
+                    continue # Skip lines without a colon
             elif line.startswith("|"):
                 if '---' in line: continue
                 table_lines.append(line)
 
         # Basic parsing for totals from metadata
         total_calories = metadata.get("total_calories")
-        total_protein_g = metadata.get("total_protein_(g)")
+        total_protein_g = metadata.get("total_protein_g")
 
         # Parse the table
         ingredients = []
@@ -71,18 +71,17 @@ def get_log():
             header_line = table_lines.pop(0)
             header = [h.strip() for h in header_line.strip('|').split('|')]
             
-            # Find column indices to make parsing more robust
             try:
                 name_idx = header.index("Ingredient")
                 cat_idx = header.index("Category")
                 cal_idx = header.index("Calories")
                 prot_idx = header.index("Protein (g)")
             except ValueError:
-                continue # Skip block if table header is missing required columns
+                continue
 
             for row_line in table_lines:
                 row = [r.strip() for r in row_line.strip('|').split('|')]
-                if len(row) != len(header): continue # Skip rows that don't match header length
+                if len(row) != len(header): continue
                 
                 try:
                     ingredient_data = {
@@ -93,7 +92,7 @@ def get_log():
                     }
                     ingredients.append(Ingredient(**ingredient_data))
                 except (ValueError, IndexError):
-                    continue # Skip malformed rows
+                    continue
 
         if ingredients:
             meal = Meal(
@@ -110,4 +109,3 @@ def get_log():
     return parsed_meals
 
 # POST /log_meal endpoint will go here
-
