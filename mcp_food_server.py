@@ -4,23 +4,13 @@ MCP Food Tracking Server
 A Model Context Protocol server for logging and analyzing food/nutrition data.
 """
 
-import asyncio
 import json
 import os
 from datetime import datetime
 from typing import Any, List, Dict, Optional
 from pathlib import Path
 
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import (
-    Tool,
-    TextContent,
-    CallToolRequest,
-    CallToolResult,
-    ListToolsRequest,
-    ListToolsResult,
-)
+from fastmcp import FastMCP
 from pydantic import BaseModel
 
 
@@ -180,244 +170,166 @@ def add_meal_to_log(meal_data: Dict[str, Any]) -> str:
         return f"Error logging meal: {str(e)}"
 
 
-# Initialize the MCP server
-server = Server("food-tracker")
+# Initialize the FastMCP server
+mcp = FastMCP("food-tracker")
 
 
-@server.list_tools()
-async def handle_list_tools() -> ListToolsResult:
-    """List available MCP tools for food tracking."""
-    return ListToolsResult(
-        tools=[
-            Tool(
-                name="add_food_entry",
-                description="Log a new food/meal entry with ingredients and nutrition data",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Original user query describing the meal"
-                        },
-                        "meal_type": {
-                            "type": "string",
-                            "description": "Type of meal (breakfast, lunch, dinner, snack)"
-                        },
-                        "date": {
-                            "type": "string",
-                            "description": "Date of the meal (YYYY-MM-DD format)"
-                        },
-                        "time": {
-                            "type": "string",
-                            "description": "Time of the meal (HH:MM format)"
-                        },
-                        "ingredients": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "category": {"type": "string"},
-                                    "calories": {"type": "number"},
-                                    "protein_g": {"type": "number"},
-                                    "carbs_g": {"type": "number"},
-                                    "fat_g": {"type": "number"}
-                                },
-                                "required": ["name"]
-                            },
-                            "description": "List of ingredients with nutrition information"
-                        }
-                    },
-                    "required": ["query", "ingredients"]
-                }
-            ),
-            Tool(
-                name="get_food_log",
-                description="Retrieve all logged food entries",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "limit": {
-                            "type": "number",
-                            "description": "Maximum number of entries to return (optional)"
-                        },
-                        "date_filter": {
-                            "type": "string",
-                            "description": "Filter by specific date (YYYY-MM-DD format, optional)"
-                        }
-                    }
-                }
-            ),
-            Tool(
-                name="analyze_nutrition",
-                description="Analyze nutrition trends and provide insights from food log",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "analysis_type": {
-                            "type": "string",
-                            "enum": ["daily_summary", "weekly_trends", "macro_breakdown", "ingredient_analysis"],
-                            "description": "Type of nutrition analysis to perform"
-                        },
-                        "date_range": {
-                            "type": "string",
-                            "description": "Date range for analysis (e.g., 'last_7_days', 'this_week', 'YYYY-MM-DD to YYYY-MM-DD')"
-                        }
-                    },
-                    "required": ["analysis_type"]
-                }
-            ),
-            Tool(
-                name="search_food_entries",
-                description="Search food entries by ingredient, meal type, or other criteria",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "search_term": {
-                            "type": "string",
-                            "description": "Term to search for in ingredients, meal types, or queries"
-                        },
-                        "search_type": {
-                            "type": "string",
-                            "enum": ["ingredient", "meal_type", "query", "all"],
-                            "description": "Type of search to perform"
-                        }
-                    },
-                    "required": ["search_term"]
-                }
-            )
-        ]
-    )
-
-
-@server.call_tool()
-async def handle_call_tool(name: str, arguments: dict) -> CallToolResult:
-    """Handle tool calls for food tracking operations."""
-    try:
-        if name == "add_food_entry":
-            result = add_meal_to_log(arguments)
-            return CallToolResult(content=[TextContent(type="text", text=result)])
-        
-        elif name == "get_food_log":
-            meals = parse_food_log()
-            limit = arguments.get("limit")
-            date_filter = arguments.get("date_filter")
-            
-            # Apply filters
-            if date_filter:
-                meals = [m for m in meals if m.date == date_filter]
-            
-            if limit:
-                meals = meals[-limit:]  # Get most recent entries
-            
-            # Format response
-            if not meals:
-                result = "No food entries found."
-            else:
-                result = f"Found {len(meals)} food entries:\n\n"
-                for meal in meals:
-                    result += f"**{meal.meal_type}** on {meal.date} at {meal.time}\n"
-                    result += f"Query: {meal.query}\n"
-                    result += f"Total Calories: {meal.total_calories}, Protein: {meal.total_protein_g}g\n"
-                    result += f"Ingredients: {', '.join([ing.name for ing in meal.ingredients])}\n\n"
-            
-            return CallToolResult(content=[TextContent(type="text", text=result)])
-        
-        elif name == "analyze_nutrition":
-            meals = parse_food_log()
-            analysis_type = arguments.get("analysis_type", "daily_summary")
-            
-            if not meals:
-                result = "No food data available for analysis."
-            else:
-                if analysis_type == "daily_summary":
-                    # Group by date and calculate daily totals
-                    daily_data = {}
-                    for meal in meals:
-                        date = meal.date
-                        if date not in daily_data:
-                            daily_data[date] = {"calories": 0, "protein": 0, "meals": 0}
-                        
-                        daily_data[date]["calories"] += meal.total_calories or 0
-                        daily_data[date]["protein"] += meal.total_protein_g or 0
-                        daily_data[date]["meals"] += 1
-                    
-                    result = "Daily Nutrition Summary:\n\n"
-                    for date, data in sorted(daily_data.items()):
-                        result += f"**{date}**: {data['calories']:.0f} calories, {data['protein']:.1f}g protein ({data['meals']} meals)\n"
-                
-                elif analysis_type == "ingredient_analysis":
-                    # Analyze ingredient frequency and nutrition contribution
-                    ingredient_stats = {}
-                    for meal in meals:
-                        for ing in meal.ingredients:
-                            name = ing.name
-                            if name not in ingredient_stats:
-                                ingredient_stats[name] = {"count": 0, "calories": 0, "protein": 0}
-                            
-                            ingredient_stats[name]["count"] += 1
-                            ingredient_stats[name]["calories"] += ing.calories or 0
-                            ingredient_stats[name]["protein"] += ing.protein_g or 0
-                    
-                    result = "Ingredient Analysis:\n\n"
-                    for ing, stats in sorted(ingredient_stats.items(), key=lambda x: x[1]["count"], reverse=True):
-                        result += f"**{ing}**: Used {stats['count']} times, {stats['calories']:.0f} total calories, {stats['protein']:.1f}g total protein\n"
-                
-                else:
-                    result = f"Analysis type '{analysis_type}' not yet implemented."
-            
-            return CallToolResult(content=[TextContent(type="text", text=result)])
-        
-        elif name == "search_food_entries":
-            meals = parse_food_log()
-            search_term = arguments.get("search_term", "").lower()
-            search_type = arguments.get("search_type", "all")
-            
-            matching_meals = []
-            for meal in meals:
-                match = False
-                
-                if search_type in ["ingredient", "all"]:
-                    for ing in meal.ingredients:
-                        if search_term in ing.name.lower():
-                            match = True
-                            break
-                
-                if search_type in ["meal_type", "all"] and meal.meal_type and search_term in meal.meal_type.lower():
-                    match = True
-                
-                if search_type in ["query", "all"] and meal.query and search_term in meal.query.lower():
-                    match = True
-                
-                if match:
-                    matching_meals.append(meal)
-            
-            if not matching_meals:
-                result = f"No entries found matching '{search_term}'"
-            else:
-                result = f"Found {len(matching_meals)} entries matching '{search_term}':\n\n"
-                for meal in matching_meals:
-                    result += f"**{meal.meal_type}** on {meal.date}: {meal.query}\n"
-            
-            return CallToolResult(content=[TextContent(type="text", text=result)])
-        
-        else:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Unknown tool: {name}")]
-            )
+@mcp.tool()
+def add_food_entry(
+    query: str,
+    ingredients: List[Dict[str, Any]],
+    meal_type: Optional[str] = None,
+    date: Optional[str] = None,
+    time: Optional[str] = None
+) -> str:
+    """Log a new food/meal entry with ingredients and nutrition data.
     
-    except Exception as e:
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"Error: {str(e)}")]
-        )
+    Args:
+        query: Original user query describing the meal
+        ingredients: List of ingredients with nutrition information
+        meal_type: Type of meal (breakfast, lunch, dinner, snack)
+        date: Date of the meal (YYYY-MM-DD format)
+        time: Time of the meal (HH:MM format)
+    """
+    meal_data = {
+        "query": query,
+        "meal_type": meal_type,
+        "date": date,
+        "time": time,
+        "ingredients": ingredients
+    }
+    return add_meal_to_log(meal_data)
 
 
-async def main():
-    """Run the MCP food tracking server."""
-    # Run the server using stdio transport
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+@mcp.tool()
+def get_food_log(
+    limit: Optional[int] = None,
+    date_filter: Optional[str] = None
+) -> str:
+    """Retrieve all logged food entries.
+    
+    Args:
+        limit: Maximum number of entries to return (optional)
+        date_filter: Filter by specific date (YYYY-MM-DD format, optional)
+    """
+    meals = parse_food_log()
+    
+    # Apply filters
+    if date_filter:
+        meals = [m for m in meals if m.date == date_filter]
+    
+    if limit:
+        meals = meals[-limit:]  # Get most recent entries
+    
+    # Format response
+    if not meals:
+        return "No food entries found."
+    else:
+        result = f"Found {len(meals)} food entries:\n\n"
+        for meal in meals:
+            result += f"**{meal.meal_type}** on {meal.date} at {meal.time}\n"
+            result += f"Query: {meal.query}\n"
+            result += f"Total Calories: {meal.total_calories}, Protein: {meal.total_protein_g}g\n"
+            result += f"Ingredients: {', '.join([ing.name for ing in meal.ingredients])}\n\n"
+        return result
+
+
+@mcp.tool()
+def analyze_nutrition(
+    analysis_type: str,
+    date_range: Optional[str] = None
+) -> str:
+    """Analyze nutrition trends and provide insights from food log.
+    
+    Args:
+        analysis_type: Type of analysis (daily_summary, weekly_trends, macro_breakdown, ingredient_analysis)
+        date_range: Date range for analysis (e.g., 'last_7_days', 'this_week', 'YYYY-MM-DD to YYYY-MM-DD')
+    """
+    meals = parse_food_log()
+    
+    if not meals:
+        return "No food data available for analysis."
+    
+    if analysis_type == "daily_summary":
+        # Group by date and calculate daily totals
+        daily_data = {}
+        for meal in meals:
+            date = meal.date
+            if date not in daily_data:
+                daily_data[date] = {"calories": 0, "protein": 0, "meals": 0}
+            
+            daily_data[date]["calories"] += meal.total_calories or 0
+            daily_data[date]["protein"] += meal.total_protein_g or 0
+            daily_data[date]["meals"] += 1
+        
+        result = "Daily Nutrition Summary:\n\n"
+        for date, data in sorted(daily_data.items()):
+            result += f"**{date}**: {data['calories']:.0f} calories, {data['protein']:.1f}g protein ({data['meals']} meals)\n"
+        return result
+    
+    elif analysis_type == "ingredient_analysis":
+        # Analyze ingredient frequency and nutrition contribution
+        ingredient_stats = {}
+        for meal in meals:
+            for ing in meal.ingredients:
+                name = ing.name
+                if name not in ingredient_stats:
+                    ingredient_stats[name] = {"count": 0, "calories": 0, "protein": 0}
+                
+                ingredient_stats[name]["count"] += 1
+                ingredient_stats[name]["calories"] += ing.calories or 0
+                ingredient_stats[name]["protein"] += ing.protein_g or 0
+        
+        result = "Ingredient Analysis:\n\n"
+        for ing, stats in sorted(ingredient_stats.items(), key=lambda x: x[1]["count"], reverse=True):
+            result += f"**{ing}**: Used {stats['count']} times, {stats['calories']:.0f} total calories, {stats['protein']:.1f}g total protein\n"
+        return result
+    
+    else:
+        return f"Analysis type '{analysis_type}' not yet implemented."
+
+
+@mcp.tool()
+def search_food_entries(
+    search_term: str,
+    search_type: str = "all"
+) -> str:
+    """Search food entries by ingredient, meal type, or other criteria.
+    
+    Args:
+        search_term: Term to search for in ingredients, meal types, or queries
+        search_type: Type of search (ingredient, meal_type, query, all)
+    """
+    meals = parse_food_log()
+    search_term_lower = search_term.lower()
+    
+    matching_meals = []
+    for meal in meals:
+        match = False
+        
+        if search_type in ["ingredient", "all"]:
+            for ing in meal.ingredients:
+                if search_term_lower in ing.name.lower():
+                    match = True
+                    break
+        
+        if search_type in ["meal_type", "all"] and meal.meal_type and search_term_lower in meal.meal_type.lower():
+            match = True
+        
+        if search_type in ["query", "all"] and meal.query and search_term_lower in meal.query.lower():
+            match = True
+        
+        if match:
+            matching_meals.append(meal)
+    
+    if not matching_meals:
+        return f"No entries found matching '{search_term}'"
+    else:
+        result = f"Found {len(matching_meals)} entries matching '{search_term}':\n\n"
+        for meal in matching_meals:
+            result += f"**{meal.meal_type}** on {meal.date}: {meal.query}\n"
+        return result
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()  # FastMCP automatically uses stdio transport by default

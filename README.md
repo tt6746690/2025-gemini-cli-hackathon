@@ -1,7 +1,68 @@
 # 2025-gemini-cli-hackathon
 
+## MCP Food Tracking Server (FastMCP Implementation)
 
-im in a hackathon, we are thinking building some functionality where we can allow LM to save information about food to a data store (e.g., database) format them nicely, and also allow LM to fetch these information when user ask about their diet habits/health trends we are thinking of using mcp (model context protocol) server to do this, and maybe jsut very simple 1 markdown file to keep track all the data. 
+A Model Context Protocol server for logging and analyzing food/nutrition data, now refactored to use FastMCP for simplified development.
+
+### Overview
+
+This project implements an MCP server that allows language models to:
+- Log food entries with detailed ingredient and nutrition information
+- Retrieve and analyze food consumption data
+- Perform nutrition analysis (daily summaries, ingredient analysis)
+- Search through food entries
+
+### Recent Changes
+
+**✅ Refactored to use FastMCP** (January 2025)
+- Migrated from the original MCP SDK to FastMCP for cleaner, more maintainable code
+- Simplified tool definitions using Python decorators
+- Reduced boilerplate code significantly
+- Maintained all original functionality
+
+### Features
+
+- **Food Entry Logging**: Add meals with detailed ingredient breakdown
+- **Data Retrieval**: Get food logs with filtering options
+- **Nutrition Analysis**: Daily summaries and ingredient analysis
+- **Search Functionality**: Find entries by ingredient, meal type, or query
+- **Markdown Storage**: Simple markdown-based data persistence
+
+### Installation & Setup
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the server
+python mcp_food_server.py
+
+# Validate the setup
+python test_simple.py
+```
+
+### Dependencies
+
+- `fastmcp`: Simplified MCP server framework
+- `pydantic`: Data validation and serialization
+
+### Tools Available
+
+1. **add_food_entry**: Log new meals with ingredients and nutrition data
+2. **get_food_log**: Retrieve logged food entries with optional filtering
+3. **analyze_nutrition**: Perform nutrition analysis (daily summaries, ingredient breakdown)
+4. **search_food_entries**: Search entries by various criteria
+
+### Data Structure
+
+Food data is stored in `data/food_log.md` with the following structure:
+- Each meal entry contains metadata (query, meal type, date, time, totals)
+- Ingredient table with nutrition information (calories, protein, etc.)
+- Support for multiple ingredients per meal
+
+### Original Project Goals
+
+Im in a hackathon, we are thinking building some functionality where we can allow LM to save information about food to a data store (e.g., database) format them nicely, and also allow LM to fetch these information when user ask about their diet habits/health trends we are thinking of using mcp (model context protocol) server to do this, and maybe jsut very simple 1 markdown file to keep track all the data. 
 
 clarifications
 - this should be done with vibe coding in 3hrs. give me a concrete plan
