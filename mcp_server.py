@@ -109,3 +109,36 @@ def get_log():
     return parsed_meals
 
 # POST /log_meal endpoint will go here
+
+@app.post("/log_meal")
+def log_meal(meal: Meal):
+    with open("data/food_log.md", "a") as f:
+        f.write("### MEAL START\n")
+        if meal.query:
+            f.write(f"**Query:** {meal.query}\n")
+        if meal.meal_type:
+            f.write(f"**Meal:** {meal.meal_type}\n")
+        if meal.date:
+            f.write(f"**Date:** {meal.date}\n")
+        if meal.time:
+            f.write(f"**Time:** {meal.time}\n")
+        if meal.total_calories:
+            f.write(f"**Total Calories:** {meal.total_calories}\n")
+        if meal.total_protein_g:
+            f.write(f"**Total Protein (g):** {meal.total_protein_g}\n")
+        f.write("\n")
+
+        if meal.ingredients:
+            f.write("| Ingredient | Category | Calories | Protein (g) |\n")
+            f.write("|------------|----------|----------|-------------|\n")
+            for ingredient in meal.ingredients:
+                name = ingredient.name or ""
+                category = ingredient.category or ""
+                calories = ingredient.calories or ""
+                protein_g = ingredient.protein_g or ""
+                f.write(f"| {name} | {category} | {calories} | {protein_g} |\n")
+        
+        f.write("### MEAL END\n\n")
+
+    return {"status": "success"}
+
