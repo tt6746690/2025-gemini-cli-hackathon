@@ -234,59 +234,59 @@ def get_food_log(
         return result
 
 
-@mcp.tool()
-def analyze_nutrition(
-    analysis_type: str,
-    date_range: Optional[str] = None
-) -> str:
-    """Analyze nutrition trends and provide insights from food log.
+# @mcp.tool()
+# def analyze_nutrition(
+#     analysis_type: str,
+#     date_range: Optional[str] = None
+# ) -> str:
+#     """Analyze nutrition trends and provide insights from food log.
     
-    Args:
-        analysis_type: Type of analysis (daily_summary, weekly_trends, macro_breakdown, ingredient_analysis)
-        date_range: Date range for analysis (e.g., 'last_7_days', 'this_week', 'YYYY-MM-DD to YYYY-MM-DD')
-    """
-    meals = parse_food_log()
+#     Args:
+#         analysis_type: Type of analysis (daily_summary, weekly_trends, macro_breakdown, ingredient_analysis)
+#         date_range: Date range for analysis (e.g., 'last_7_days', 'this_week', 'YYYY-MM-DD to YYYY-MM-DD')
+#     """
+#     meals = parse_food_log()
     
-    if not meals:
-        return "No food data available for analysis."
+#     if not meals:
+#         return "No food data available for analysis."
     
-    if analysis_type == "daily_summary":
-        # Group by date and calculate daily totals
-        daily_data = {}
-        for meal in meals:
-            date = meal.date
-            if date not in daily_data:
-                daily_data[date] = {"calories": 0, "protein": 0, "meals": 0}
+#     if analysis_type == "daily_summary":
+#         # Group by date and calculate daily totals
+#         daily_data = {}
+#         for meal in meals:
+#             date = meal.date
+#             if date not in daily_data:
+#                 daily_data[date] = {"calories": 0, "protein": 0, "meals": 0}
             
-            daily_data[date]["calories"] += meal.total_calories or 0
-            daily_data[date]["protein"] += meal.total_protein_g or 0
-            daily_data[date]["meals"] += 1
+#             daily_data[date]["calories"] += meal.total_calories or 0
+#             daily_data[date]["protein"] += meal.total_protein_g or 0
+#             daily_data[date]["meals"] += 1
         
-        result = "Daily Nutrition Summary:\n\n"
-        for date, data in sorted(daily_data.items()):
-            result += f"**{date}**: {data['calories']:.0f} calories, {data['protein']:.1f}g protein ({data['meals']} meals)\n"
-        return result
+#         result = "Daily Nutrition Summary:\n\n"
+#         for date, data in sorted(daily_data.items()):
+#             result += f"**{date}**: {data['calories']:.0f} calories, {data['protein']:.1f}g protein ({data['meals']} meals)\n"
+#         return result
     
-    elif analysis_type == "ingredient_analysis":
-        # Analyze ingredient frequency and nutrition contribution
-        ingredient_stats = {}
-        for meal in meals:
-            for ing in meal.ingredients:
-                name = ing.name
-                if name not in ingredient_stats:
-                    ingredient_stats[name] = {"count": 0, "calories": 0, "protein": 0}
+#     elif analysis_type == "ingredient_analysis":
+#         # Analyze ingredient frequency and nutrition contribution
+#         ingredient_stats = {}
+#         for meal in meals:
+#             for ing in meal.ingredients:
+#                 name = ing.name
+#                 if name not in ingredient_stats:
+#                     ingredient_stats[name] = {"count": 0, "calories": 0, "protein": 0}
                 
-                ingredient_stats[name]["count"] += 1
-                ingredient_stats[name]["calories"] += ing.calories or 0
-                ingredient_stats[name]["protein"] += ing.protein_g or 0
+#                 ingredient_stats[name]["count"] += 1
+#                 ingredient_stats[name]["calories"] += ing.calories or 0
+#                 ingredient_stats[name]["protein"] += ing.protein_g or 0
         
-        result = "Ingredient Analysis:\n\n"
-        for ing, stats in sorted(ingredient_stats.items(), key=lambda x: x[1]["count"], reverse=True):
-            result += f"**{ing}**: Used {stats['count']} times, {stats['calories']:.0f} total calories, {stats['protein']:.1f}g total protein\n"
-        return result
+#         result = "Ingredient Analysis:\n\n"
+#         for ing, stats in sorted(ingredient_stats.items(), key=lambda x: x[1]["count"], reverse=True):
+#             result += f"**{ing}**: Used {stats['count']} times, {stats['calories']:.0f} total calories, {stats['protein']:.1f}g total protein\n"
+#         return result
     
-    else:
-        return f"Analysis type '{analysis_type}' not yet implemented."
+#     else:
+#         return f"Analysis type '{analysis_type}' not yet implemented."
 
 
 @mcp.tool()
